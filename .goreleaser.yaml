@@ -1,0 +1,162 @@
+# GoReleaser configuration for tailscale-portal
+# Documentation: https://goreleaser.com
+#
+# NOTE: Before your first release, update the placeholders marked with
+# "YOUR_GITHUB_USERNAME" and "Your Name" below.
+
+version: 2
+
+project_name: tailscale-portal
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: tailscale-portal
+    main: .
+    binary: tailscale-portal
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+    goarm:
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - id: tarballs
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+
+# Homebrew tap configuration
+# IMPORTANT:
+# 1. Replace YOUR_GITHUB_USERNAME with your actual GitHub username
+# 2. Create a public repository named "homebrew-tap" on GitHub
+# 3. GoReleaser will automatically push formula updates to this repo
+brews:
+  - name: tailscale-portal
+    repository:
+      owner: YOUR_GITHUB_USERNAME
+      name: homebrew-tap
+      branch: main
+    homepage: "https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal"
+    description: "TUI dashboard for managing Tailscale serve ports"
+    license: "MIT"
+    directory: Formula
+    test: |
+      system "#{bin}/tailscale-portal", "--version"
+    install: |
+      bin.install "tailscale-portal"
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+# Linux package configuration (DEB, RPM, APK)
+# Generates installable system packages for major Linux distributions
+nfpms:
+  - id: packages
+    package_name: tailscale-portal
+    vendor: "tailscale-portal"
+    homepage: "https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal"
+    maintainer: "Your Name <your.email@example.com>"
+    description: "TUI dashboard for managing Tailscale serve ports"
+    license: "MIT"
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/local/bin
+    section: utils
+    priority: optional
+    contents:
+      - src: ./README.md
+        dst: /usr/share/doc/tailscale-portal/README.md
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: ./LICENSE
+        dst: /usr/share/doc/tailscale-portal/LICENSE
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+
+release:
+  draft: false
+  prerelease: auto
+  name_template: "{{ .ProjectName }} {{ .Tag }}"
+  header: |
+    ## Tailscale Portal {{ .Tag }}
+
+    TUI dashboard for managing Tailscale serve ports.
+  footer: |
+    ## Installation
+
+    ### macOS/Linux (Homebrew)
+    ```bash
+    brew tap YOUR_GITHUB_USERNAME/tap
+    brew install tailscale-portal
+    ```
+
+    ### Debian/Ubuntu (DEB)
+    ```bash
+    sudo dpkg -i tailscale-portal_{{ .Version }}_linux_amd64.deb
+    ```
+
+    ### Fedora/RHEL (RPM)
+    ```bash
+    sudo rpm -i tailscale-portal_{{ .Version }}_linux_amd64.rpm
+    ```
+
+    ### Alpine Linux (APK)
+    ```bash
+    sudo apk add --allow-untrusted tailscale-portal_{{ .Version }}_linux_amd64.apk
+    ```
+
+    ### Direct Download
+    Download the appropriate archive for your platform from the assets below.
+  mode: replace

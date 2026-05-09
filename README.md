@@ -1,134 +1,158 @@
 # Tailscale Portal
 
-A TUI dashboard for managing Tailscale serve ports. View active services, copy URLs, and stop services with an intuitive terminal interface.
+A beautiful terminal dashboard for managing your Tailscale serve ports. No more squinting at `tailscale serve status` output — see all your services at a glance, copy URLs instantly, and stop services with a keystroke.
 
-## Features
+```
+┌────────────────────────────────────────────── Tailscale Portal ──────────────────────────────────────────────┐
+│ 5 services active                                                                                              │
+│                                                                                                                │
+│  > dashboard    :8443   HTTPS  -> http://localhost:3000          https://myhost.ts.net:8443                    │
+│    api          :8080   HTTPS  -> http://localhost:8080          https://myhost.ts.net:8080                    │
+│    docs         :3001   HTTP   -> http://localhost:3001          http://myhost.ts.net:3001                     │
+│    blog         :443    HTTPS  -> http://localhost:4000          https://myhost.ts.net                         │
+│    metrics      :9090   HTTPS  -> http://localhost:9090          https://myhost.ts.net:9090                    │
+│                                                                                                                │
+│  ↑/↓ navigate  •  Enter/s stop  •  c copy URL  •  r refresh  •  ? help  •  q quit                              │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
-- **Service Overview**: View all active Tailscale serve services in a clean, scrollable list
-- **Service Details**: See port, protocol (HTTP/HTTPS), target, path, and full URL for each service
-- **Quick Actions**:
-  - Copy service URLs to clipboard
-  - Stop/clear services with confirmation
-  - Refresh to get latest status
-- **Keyboard Navigation**: Vim-style (j/k) and arrow key support
-- **Dark Mode**: Beautiful dark theme with color-coded protocols
+## What is this?
+
+If you use [Tailscale serve](https://tailscale.com/kb/1242/tailscale-serve) to expose local services over your tailnet, you've probably typed `tailscale serve status` a hundred times. **Tailscale Portal** gives you a live, interactive view of all your served ports in a clean terminal interface.
+
+**Perfect for:**
+- Quickly seeing which ports are being served
+- Copying URLs to share with teammates
+- Cleaning up stale services without memoring CLI flags
 
 ## Installation
 
-### Prerequisites
+### macOS / Linux (Homebrew)
 
-- Go 1.21 or later
-- Tailscale installed and configured
-- `tailscale` CLI in your PATH
+```bash
+brew tap YOUR_GITHUB_USERNAME/tap
+brew install tailscale-portal
+```
+
+### Debian / Ubuntu
+
+```bash
+wget https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest/download/tailscale-portal_linux_amd64.deb
+sudo dpkg -i tailscale-portal_linux_amd64.deb
+```
+
+### Fedora / RHEL / CentOS
+
+```bash
+wget https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest/download/tailscale-portal_linux_amd64.rpm
+sudo rpm -i tailscale-portal_linux_amd64.rpm
+```
+
+### Alpine Linux
+
+```bash
+wget https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest/download/tailscale-portal_linux_amd64.apk
+sudo apk add --allow-untrusted tailscale-portal_linux_amd64.apk
+```
+
+### Direct Download
+
+Grab the binary for your platform from the [latest release](https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest) and move it to your `PATH`:
+
+```bash
+# macOS (Apple Silicon)
+curl -L -o tailscale-portal.tar.gz \
+  https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest/download/tailscale-portal_darwin_arm64.tar.gz
+tar -xzf tailscale-portal.tar.gz
+sudo mv tailscale-portal /usr/local/bin/
+```
 
 ### Build from Source
 
+Requires Go 1.21+:
+
 ```bash
-git clone <repository>
+git clone https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal.git
 cd tailscale-portal
 go build -o tailscale-portal
 ```
 
-Or run directly:
+## Quick Start
+
+Just run it:
 
 ```bash
-go run .
+tailscale-portal
 ```
 
-## Usage
+That's it. It opens a full-screen dashboard showing all your active Tailscale serve services.
 
-Simply run the binary:
+## Controls
 
-```bash
-./tailscale-portal
-```
-
-### Key Bindings
-
-| Key | Action |
-|-----|--------|
-| `↑`/`↓` or `j`/`k` | Navigate up/down |
+| Key | What it does |
+|-----|-------------|
+| `↑` `↓` or `j` `k` | Move up / down the list |
 | `Enter` or `s` | Stop the selected service |
-| `c` | Copy service URL to clipboard |
-| `r` or `R` | Refresh service list |
-| `?` or `h` | Toggle help dialog |
+| `c` | Copy the service URL to your clipboard |
+| `r` or `R` | Refresh the list |
+| `?` or `h` | Show / hide help |
 | `q` or `Ctrl+C` | Quit |
 
 ### Stopping a Service
 
 1. Navigate to the service you want to stop
 2. Press `Enter` or `s`
-3. Confirm by pressing `y`
-4. The list will automatically refresh
+3. Confirm with `y`
+4. The list refreshes automatically
 
-## Data Model
+### Copying a URL
 
-The app parses output from `tailscale serve status --json`:
+1. Navigate to the service
+2. Press `c`
+3. The full URL (e.g. `https://yourhost.ts.net:8443`) is now in your clipboard
 
-```json
-{
-  "TCP": {
-    "3000": { "HTTPS": true },
-    "443": { "HTTPS": true }
-  },
-  "Web": {
-    "hostname.ts.net:3000": {
-      "Handlers": {
-        "/": { "Proxy": "http://localhost:5173" }
-      }
-    }
-  }
-}
-```
+## Requirements
 
-## Project Structure
-
-```
-tailscale-portal/
-├── go.mod          # Go module definition
-├── main.go         # Application entry point
-├── model.go        # Bubble Tea model and data structures
-├── update.go       # Message handling and state updates
-├── view.go         # UI rendering functions
-├── parser.go       # JSON parsing logic
-├── commands.go     # Tailscale CLI command wrappers
-├── styles.go       # Lipgloss styling definitions
-└── README.md       # This file
-```
+- [Tailscale](https://tailscale.com/download) installed and logged in
+- The `tailscale` CLI in your `PATH`
+- At least one active `tailscale serve` configuration (or the list will be empty — that's normal!)
 
 ## Troubleshooting
 
-### "tailscale CLI not found"
+**"tailscale CLI not found"**
 
-Make sure Tailscale is installed and the `tailscale` command is in your PATH.
+Tailscale needs to be installed and the `tailscale` command available in your shell. Install it from [tailscale.com/download](https://tailscale.com/download) if you haven't already.
 
-Install Tailscale:
-- macOS: `brew install tailscale`
-- Linux: https://tailscale.com/download/linux
-- Windows: https://tailscale.com/download/windows
+**Clipboard doesn't work**
 
-### Clipboard not working
+The app tries to use your system's clipboard tool:
+- **macOS:** `pbcopy` (built-in)
+- **Linux (X11):** `xclip` — install with `sudo apt install xclip`
+- **Linux (Wayland):** `wl-copy` — install with `sudo apt install wl-clipboard`
 
-The app tries multiple clipboard tools:
-- macOS: `pbcopy`
-- Linux (X11): `xclip`
-- Linux (Wayland): `wl-copy`
+**No services are showing**
 
-Install the appropriate tool for your system.
-
-### No services shown
-
-If no services appear, ensure you have active Tailscale serve configurations:
+If the list is empty, you likely don't have any `tailscale serve` configurations active. Check with:
 
 ```bash
 tailscale serve status
 ```
 
-To add a service:
+To serve a local app:
 
 ```bash
 tailscale serve --https=443 --set-path=/ http://localhost:3000
 ```
+
+Then run `tailscale-portal` again and it will appear.
+
+## Documentation
+
+For developers and contributors:
+
+- [`docs/development.md`](docs/development.md) — Development setup, project structure, running tests
+- [`docs/architecture.md`](docs/architecture.md) — Data model, parsing logic, UI architecture
+- [`docs/releasing.md`](docs/releasing.md) — CI/CD pipeline, GoReleaser config, creating releases
 
 ## License
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -9,16 +10,43 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// commandRunner defines the interface for executing external commands
+type commandRunner interface {
+	Run(name string, arg ...string) ([]byte, error)
+	RunWithStdin(name string, stdin string, arg ...string) error
+}
+
+// realCommandRunner is the production implementation
+type realCommandRunner struct{}
+
+func (r *realCommandRunner) Run(name string, arg ...string) ([]byte, error) {
+	cmd := exec.Command(name, arg...)
+	return cmd.CombinedOutput()
+}
+
+func (r *realCommandRunner) RunWithStdin(name string, stdin string, arg ...string) error {
+	cmd := exec.Command(name, arg...)
+	cmd.Stdin = strings.NewReader(stdin)
+	return cmd.Run()
+}
+
+// Global runner that can be swapped for testing
+var cmdRunner commandRunner = &realCommandRunner{}
+
+// SetCommandRunner sets the command runner (used for testing)
+func SetCommandRunner(r commandRunner) {
+	cmdRunner = r
+}
+
 // fetchStatus runs the tailscale serve status command and returns the parsed status
 func fetchStatus() tea.Cmd {
 	return func() tea.Msg {
-		cmd := exec.Command("tailscale", "serve", "status", "--json")
-		output, err := cmd.CombinedOutput()
-		
+		output, err := cmdRunner.Run("tailscale", "serve", "status", "--json")
+
 		if err != nil {
 			// Check if tailscale is not found
-			if strings.Contains(string(output), "not found") || 
-			   strings.Contains(err.Error(), "executable file not found") {
+			if strings.Contains(string(output), "not found") ||
+				strings.Contains(err.Error(), "executable file not found") {
 				return statusMsg{
 					err: fmt.Errorf("tailscale CLI not found. Please install Tailscale: https://tailscale.com/download"),
 				}
@@ -53,8 +81,7 @@ func stopService(port string, protocol string) tea.Cmd {
 			args = []string{"serve", "--http=" + port, "off"}
 		}
 
-		cmd := exec.Command("tailscale", args...)
-		output, err := cmd.CombinedOutput()
+		output, err := cmdRunner.Run("tailscale", args...)
 
 		if err != nil {
 			return stopCompleteMsg{
@@ -79,23 +106,17 @@ func refreshList() tea.Cmd {
 func copyToClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
 		// Try using pbcopy on macOS
-		cmd := exec.Command("pbcopy")
-		cmd.Stdin = strings.NewReader(text)
-		if err := cmd.Run(); err == nil {
+		if err := cmdRunner.RunWithStdin("pbcopy", text); err == nil {
 			return clearSuccessMsg{}
 		}
 
 		// Try using xclip on Linux
-		cmd = exec.Command("xclip", "-selection", "clipboard")
-		cmd.Stdin = strings.NewReader(text)
-		if err := cmd.Run(); err == nil {
+		if err := cmdRunner.RunWithStdin("xclip", text, "-selection", "clipboard"); err == nil {
 			return clearSuccessMsg{}
 		}
 
 		// Try using wl-copy on Wayland
-		cmd = exec.Command("wl-copy")
-		cmd.Stdin = strings.NewReader(text)
-		if err := cmd.Run(); err == nil {
+		if err := cmdRunner.RunWithStdin("wl-copy", text); err == nil {
 			return clearSuccessMsg{}
 		}
 
@@ -104,4 +125,61 @@ func copyToClipboard(text string) tea.Cmd {
 			err: fmt.Errorf("failed to copy to clipboard: no clipboard tool available (tried pbcopy, xclip, wl-copy)"),
 		}
 	}
+}
+
+// mockCommandRunner is a mock implementation for testing
+type mockCommandRunner struct {
+	RunFunc           func(name string, arg ...string) ([]byte, error)
+	RunWithStdinFunc  func(name string, stdin string, arg ...string) error
+	runCalls          []runCall
+	runWithStdinCalls []runWithStdinCall
+}
+
+type runCall struct {
+	name string
+	args []string
+}
+
+type runWithStdinCall struct {
+	name  string
+	stdin string
+	args  []string
+}
+
+func (m *mockCommandRunner) Run(name string, arg ...string) ([]byte, error) {
+	m.runCalls = append(m.runCalls, runCall{name: name, args: arg})
+	if m.RunFunc != nil {
+		return m.RunFunc(name, arg...)
+	}
+	return nil, fmt.Errorf("mock Run not implemented")
+}
+
+func (m *mockCommandRunner) RunWithStdin(name string, stdin string, arg ...string) error {
+	m.runWithStdinCalls = append(m.runWithStdinCalls, runWithStdinCall{name: name, stdin: stdin, args: arg})
+	if m.RunWithStdinFunc != nil {
+		return m.RunWithStdinFunc(name, stdin, arg...)
+	}
+	return fmt.Errorf("mock RunWithStdin not implemented")
+}
+
+func (m *mockCommandRunner) getRunCalls() []runCall {
+	return m.runCalls
+}
+
+func (m *mockCommandRunner) getRunWithStdinCalls() []runWithStdinCall {
+	return m.runWithStdinCalls
+}
+
+// Helper function to reset the global runner to the real implementation
+func resetCommandRunner() {
+	cmdRunner = &realCommandRunner{}
+}
+
+// For async testing with context
+type ctxKey string
+
+const testRunnerKey ctxKey = "testRunner"
+
+func withTestRunner(ctx context.Context, runner commandRunner) context.Context {
+	return context.WithValue(ctx, testRunnerKey, runner)
 }
