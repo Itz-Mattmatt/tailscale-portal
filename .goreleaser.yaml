@@ -138,7 +138,7 @@ release:
 
     ### macOS/Linux (Homebrew)
     ```bash
-    brew tap YOUR_GITHUB_USERNAME/tap
+    brew tap Itz-Mattmatt/tap
     brew install tailscale-portal
     ```
 
