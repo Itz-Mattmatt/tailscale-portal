@@ -35,6 +35,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.showConfirm = false
 				m.confirmIndex = -1
 			}
+			if m.showInfo {
+				m.showInfo = false
+				m.infoIndex = -1
+			}
 			m.showHelp = !m.showHelp
 			return m, nil
 			
@@ -42,6 +46,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.showConfirm {
 				m.showConfirm = false
 				m.confirmIndex = -1
+			}
+			if m.showInfo {
+				m.showInfo = false
+				m.infoIndex = -1
 			}
 			m.loading = true
 			m.err = nil
@@ -74,9 +82,47 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Handle info popup
+		if m.showInfo {
+			switch msg.String() {
+			case "s":
+				// Stop from info popup
+				m.showInfo = false
+				if m.infoIndex >= 0 && m.infoIndex < len(m.services) {
+					service := m.services[m.infoIndex]
+					m.confirmIndex = m.infoIndex
+					m.showConfirm = true
+					m.confirmMsg = "Stop service " + service.ServiceName + "?"
+				}
+				m.infoIndex = -1
+				return m, nil
+			case "enter", "esc", "q":
+				// Close info popup
+				m.showInfo = false
+				m.infoIndex = -1
+				return m, nil
+			}
+			return m, nil
+		}
+
 		// Handle list navigation and actions
 		switch msg.String() {
-		case "enter", "s":
+		case "enter":
+			// Open info popup
+			if item, ok := m.list.SelectedItem().(Service); ok {
+				// Find the index of this service
+				for i, svc := range m.services {
+					if svc.ServiceName == item.ServiceName && svc.Path == item.Path {
+						m.infoIndex = i
+						m.showInfo = true
+						break
+					}
+				}
+			}
+			return m, nil
+
+		case "s":
+			// Stop service - open confirm dialog
 			if item, ok := m.list.SelectedItem().(Service); ok {
 				// Find the index of this service
 				for i, svc := range m.services {
@@ -141,7 +187,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Pass other messages to the list
-	if !m.showHelp && !m.showConfirm {
+	if !m.showHelp && !m.showConfirm && !m.showInfo {
 		newListModel, cmd := m.list.Update(msg)
 		m.list = newListModel
 		cmds = append(cmds, cmd)

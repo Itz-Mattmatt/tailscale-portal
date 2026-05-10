@@ -66,6 +66,8 @@ type Model struct {
 	showConfirm  bool // Show stop confirmation dialog
 	confirmIndex int  // Index of service to stop
 	confirmMsg   string
+	showInfo     bool // Show info popup
+	infoIndex    int  // Index of service being viewed
 	width        int
 	height       int
 }
@@ -114,6 +116,8 @@ func InitialModel() Model {
 		showHelp:     false,
 		showConfirm:  false,
 		confirmIndex: -1,
+		showInfo:     false,
+		infoIndex:    -1,
 	}
 }
 

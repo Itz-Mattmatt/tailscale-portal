@@ -20,6 +20,10 @@ func (m Model) View() string {
 		return m.renderConfirmDialog()
 	}
 
+	if m.showInfo {
+		return m.renderInfoPopup()
+	}
+
 	var b strings.Builder
 
 	// Header
@@ -122,7 +126,8 @@ func (m Model) renderFooter() string {
 
 	hints = append(hints, keyStyle.Render("↑/↓")+" navigate")
 	hints = append(hints, keyStyle.Render("r")+" refresh")
-	hints = append(hints, keyStyle.Render("s/enter")+" stop")
+	hints = append(hints, keyStyle.Render("enter")+" details")
+	hints = append(hints, keyStyle.Render("s")+" stop")
 	hints = append(hints, keyStyle.Render("c")+" copy URL")
 	hints = append(hints, keyStyle.Render("?/h")+" help")
 	hints = append(hints, keyStyle.Render("q")+" quit")
@@ -143,7 +148,8 @@ func (m Model) renderHelpView() string {
 		desc string
 	}{
 		{"↑/↓ or j/k", "Navigate up/down through services"},
-		{"Enter or s", "Stop/clear the selected service"},
+		{"Enter", "View service details"},
+		{"s", "Stop/clear the selected service"},
 		{"c", "Copy selected service URL to clipboard"},
 		{"r or R", "Refresh the service list"},
 		{"? or h", "Toggle this help dialog"},
@@ -189,6 +195,54 @@ func (m Model) renderConfirmDialog() string {
 		lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#FFA500")).
+			Padding(1, 2).
+			Render(dialog))
+}
+
+// renderInfoPopup renders the service details popup
+func (m Model) renderInfoPopup() string {
+	if m.infoIndex < 0 || m.infoIndex >= len(m.services) {
+		return ""
+	}
+
+	service := m.services[m.infoIndex]
+	var b strings.Builder
+
+	b.WriteString(titleStyle.Render(" Service Details "))
+	b.WriteString("\n\n")
+
+	// Service fields
+	fields := []struct {
+		label string
+		value string
+	}{
+		{"Service Name", service.ServiceName},
+		{"Hostname", service.Hostname},
+		{"Port", service.Port},
+		{"Protocol", service.Protocol},
+		{"Target", service.Target},
+		{"Path", service.Path},
+		{"Full URL", service.FullURL},
+	}
+
+	for _, field := range fields {
+		b.WriteString(keyStyle.Render(fmt.Sprintf(" %-12s ", field.label)))
+		b.WriteString(" ")
+		b.WriteString(field.value)
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(keyStyle.Render(" s ") + " stop  ")
+	b.WriteString(keyStyle.Render(" esc ") + " close")
+
+	dialog := b.String()
+
+	// Center the dialog
+	return lipgloss.Place(m.width, m.height,
+		lipgloss.Center, lipgloss.Center,
+		lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
 			Padding(1, 2).
 			Render(dialog))
 }

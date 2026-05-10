@@ -358,7 +358,7 @@ func TestUpdateConfirmDialogEsc(t *testing.T) {
 	}
 }
 
-func TestUpdateKeyEnterShowsConfirm(t *testing.T) {
+func TestUpdateKeyEnterShowsInfoPopup(t *testing.T) {
 	m := createModelWithServices()
 	m.list.Select(0) // Select first item
 	
@@ -370,16 +370,12 @@ func TestUpdateKeyEnterShowsConfirm(t *testing.T) {
 		t.Fatal("Expected Model type")
 	}
 	
-	if !newM.showConfirm {
-		t.Error("Expected showConfirm to be true")
+	if !newM.showInfo {
+		t.Error("Expected showInfo to be true")
 	}
 	
-	if newM.confirmIndex != 0 {
-		t.Errorf("Expected confirmIndex to be 0, got %d", newM.confirmIndex)
-	}
-	
-	if newM.confirmMsg == "" {
-		t.Error("Expected confirmMsg to be set")
+	if newM.infoIndex != 0 {
+		t.Errorf("Expected infoIndex to be 0, got %d", newM.infoIndex)
 	}
 	
 	if cmd != nil {
