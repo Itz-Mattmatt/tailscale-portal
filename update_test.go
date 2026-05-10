@@ -179,6 +179,50 @@ func TestUpdateKeyToggleHelpCancelsConfirm(t *testing.T) {
 	}
 }
 
+func TestUpdateKeyHelpBlockedInForms(t *testing.T) {
+	tests := []struct {
+		name       string
+		key        string
+		setupModel func(Model) Model
+		checkField string
+	}{
+		{"h in new serve dialog", "h", func(m Model) Model { m.showNewServe = true; m.serveForm.focusIndex = 0; m.serveForm.inputs[0].Focus(); return m }, "showNewServe"},
+		{"? in new serve dialog", "?", func(m Model) Model { m.showNewServe = true; m.serveForm.focusIndex = 0; m.serveForm.inputs[0].Focus(); return m }, "showNewServe"},
+		{"h in edit fav dialog", "h", func(m Model) Model { m.showEditFav = true; m.editFavForm.focusIndex = 0; m.editFavForm.inputs[0].Focus(); return m }, "showEditFav"},
+		{"? in edit fav dialog", "?", func(m Model) Model { m.showEditFav = true; m.editFavForm.focusIndex = 0; m.editFavForm.inputs[0].Focus(); return m }, "showEditFav"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := createModelWithServices()
+			m = tt.setupModel(m)
+
+			msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tt.key)}
+			newModel, _ := m.Update(msg)
+
+			newM, ok := newModel.(Model)
+			if !ok {
+				t.Fatal("Expected Model type")
+			}
+
+			if newM.showHelp {
+				t.Error("Expected showHelp to remain false when typing in form")
+			}
+
+			switch tt.checkField {
+			case "showNewServe":
+				if !newM.showNewServe {
+					t.Error("Expected showNewServe to remain true")
+				}
+			case "showEditFav":
+				if !newM.showEditFav {
+					t.Error("Expected showEditFav to remain true")
+				}
+			}
+		})
+	}
+}
+
 func TestUpdateKeyRefresh(t *testing.T) {
 	m := createModelWithServices()
 	m.err = errors.New("some error")

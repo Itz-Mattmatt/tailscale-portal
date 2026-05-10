@@ -55,6 +55,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 			
 		case "?", "h":
+			// Don't toggle help when typing in form inputs
+			if m.showNewServe || m.showEditFav {
+				break
+			}
 			if m.showConfirm {
 				m.showConfirm = false
 				m.confirmIndex = -1
