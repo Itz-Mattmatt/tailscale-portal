@@ -30,39 +30,39 @@ If you use [Tailscale serve](https://tailscale.com/kb/1242/tailscale-serve) to e
 ### macOS / Linux (Homebrew)
 
 ```bash
-brew tap YOUR_GITHUB_USERNAME/tap
+brew tap Itz-Mattmatt/tap
 brew install tailscale-portal
 ```
 
 ### Debian / Ubuntu
 
 ```bash
-wget https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest/download/tailscale-portal_linux_amd64.deb
+wget https://github.com/Itz-Mattmatt/tailscale-portal/releases/latest/download/tailscale-portal_linux_amd64.deb
 sudo dpkg -i tailscale-portal_linux_amd64.deb
 ```
 
 ### Fedora / RHEL / CentOS
 
 ```bash
-wget https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest/download/tailscale-portal_linux_amd64.rpm
+wget https://github.com/Itz-Mattmatt/tailscale-portal/releases/latest/download/tailscale-portal_linux_amd64.rpm
 sudo rpm -i tailscale-portal_linux_amd64.rpm
 ```
 
 ### Alpine Linux
 
 ```bash
-wget https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest/download/tailscale-portal_linux_amd64.apk
+wget https://github.com/Itz-Mattmatt/tailscale-portal/releases/latest/download/tailscale-portal_linux_amd64.apk
 sudo apk add --allow-untrusted tailscale-portal_linux_amd64.apk
 ```
 
 ### Direct Download
 
-Grab the binary for your platform from the [latest release](https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest) and move it to your `PATH`:
+Grab the binary for your platform from the [latest release](https://github.com/Itz-Mattmatt/tailscale-portal/releases/latest) and move it to your `PATH`:
 
 ```bash
 # macOS (Apple Silicon)
 curl -L -o tailscale-portal.tar.gz \
-  https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal/releases/latest/download/tailscale-portal_darwin_arm64.tar.gz
+  https://github.com/Itz-Mattmatt/tailscale-portal/releases/latest/download/tailscale-portal_darwin_arm64.tar.gz
 tar -xzf tailscale-portal.tar.gz
 sudo mv tailscale-portal /usr/local/bin/
 ```
@@ -72,7 +72,7 @@ sudo mv tailscale-portal /usr/local/bin/
 Requires Go 1.21+:
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal.git
+git clone https://github.com/Itz-Mattmatt/tailscale-portal.git
 cd tailscale-portal
 go build -o tailscale-portal
 ```
