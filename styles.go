@@ -119,3 +119,56 @@ var (
 		Foreground(lipgloss.Color(colorPrimary)).
 		Italic(true)
 )
+
+// Dialog styles
+var (
+	dialogBoxStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		Padding(1, 2)
+
+	dialogTitleStyle = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(colorPrimary))
+
+	formLabelStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorForeground)).
+		Bold(true)
+
+	formInputStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorForeground))
+
+	formInputFocusedStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorHighlight))
+
+	toggleActiveStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorBackground)).
+		Background(lipgloss.Color(colorPrimary)).
+		Bold(true).
+		Padding(0, 1)
+
+	toggleInactiveStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorMuted)).
+		Padding(0, 1)
+
+	checkboxCheckedStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorSuccess))
+
+	checkboxUncheckedStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorMuted))
+
+	favouriteStarStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorWarning))
+
+	runningBadgeStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorSuccess))
+
+	foregroundBadgeStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorBackground)).
+		Background(lipgloss.Color(colorInfo)).
+		Bold(true).
+		Padding(0, 1)
+
+	dialogFooterStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorMuted)).
+		Italic(true)
+)

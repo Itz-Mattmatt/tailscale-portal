@@ -18,6 +18,17 @@ func ParseStatus(data []byte) (TailscaleStatus, error) {
 // ServicesFromStatus converts TailscaleStatus to a flattened list of Services
 func ServicesFromStatus(status TailscaleStatus) []Service {
 	var services []Service
+	services = append(services, flattenWeb(status, false)...)
+	for _, fg := range status.Foreground {
+		services = append(services, flattenWeb(fg, true)...)
+	}
+	return services
+}
+
+// flattenWeb extracts services from the Web section of a status block.
+// isForeground marks services that belong to a foreground process.
+func flattenWeb(status TailscaleStatus, isForeground bool) []Service {
+	var services []Service
 
 	for serviceName, webConfig := range status.Web {
 		// Parse serviceName (hostname:port)
@@ -39,13 +50,14 @@ func ServicesFromStatus(status TailscaleStatus) []Service {
 			fullURL := buildFullURL(hostname, port, protocol, path)
 
 			service := Service{
-				ServiceName: serviceName,
-				Hostname:    hostname,
-				Port:        port,
-				Protocol:    protocol,
-				Target:      handler.Proxy,
-				Path:        path,
-				FullURL:     fullURL,
+				ServiceName:  serviceName,
+				Hostname:     hostname,
+				Port:         port,
+				Protocol:     protocol,
+				Target:       handler.Proxy,
+				Path:         path,
+				FullURL:      fullURL,
+				IsForeground: isForeground,
 			}
 			services = append(services, service)
 		}

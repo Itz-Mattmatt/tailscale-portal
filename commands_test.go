@@ -491,6 +491,154 @@ func TestSetCommandRunner(t *testing.T) {
 	cmdRunner = originalRunner
 }
 
+func TestStartServiceHTTPS(t *testing.T) {
+	var capturedArgs []string
+	mock := mockCommandRunnerForTests(
+		func(name string, arg ...string) ([]byte, error) {
+			if name == "tailscale" {
+				capturedArgs = arg
+				return []byte("ok"), nil
+			}
+			return nil, fmt.Errorf("unexpected command")
+		},
+		nil,
+	)
+
+	SetCommandRunner(mock)
+	defer resetCommandRunner()
+
+	cmd := startService(443, "http://localhost:3000", "/", "https", "serve")
+	msg := cmd()
+
+	startMsg, ok := msg.(startCompleteMsg)
+	if !ok {
+		t.Fatalf("Expected startCompleteMsg, got %T", msg)
+	}
+	if startMsg.err != nil {
+		t.Errorf("Expected no error, got %v", startMsg.err)
+	}
+
+	if len(capturedArgs) != 4 {
+		t.Fatalf("Expected 4 args, got %d: %v", len(capturedArgs), capturedArgs)
+	}
+	if capturedArgs[0] != "serve" {
+		t.Errorf("Expected first arg to be 'serve', got %s", capturedArgs[0])
+	}
+	if capturedArgs[1] != "--bg" {
+		t.Errorf("Expected second arg to be '--bg', got %s", capturedArgs[1])
+	}
+	if capturedArgs[2] != "--https=443" {
+		t.Errorf("Expected third arg to be '--https=443', got %s", capturedArgs[2])
+	}
+	if capturedArgs[3] != "localhost:3000" {
+		t.Errorf("Expected fourth arg to be 'localhost:3000', got %s", capturedArgs[3])
+	}
+}
+
+func TestStartServiceHTTP(t *testing.T) {
+	var capturedArgs []string
+	mock := mockCommandRunnerForTests(
+		func(name string, arg ...string) ([]byte, error) {
+			if name == "tailscale" {
+				capturedArgs = arg
+				return []byte("ok"), nil
+			}
+			return nil, fmt.Errorf("unexpected command")
+		},
+		nil,
+	)
+
+	SetCommandRunner(mock)
+	defer resetCommandRunner()
+
+	cmd := startService(8080, "http://localhost:8080", "/api", "http", "serve")
+	cmd()
+
+	if len(capturedArgs) != 5 {
+		t.Fatalf("Expected 5 args, got %d: %v", len(capturedArgs), capturedArgs)
+	}
+	if capturedArgs[0] != "serve" {
+		t.Errorf("Expected first arg to be 'serve', got %s", capturedArgs[0])
+	}
+	if capturedArgs[1] != "--bg" {
+		t.Errorf("Expected second arg to be '--bg', got %s", capturedArgs[1])
+	}
+	if capturedArgs[2] != "--http=8080" {
+		t.Errorf("Expected third arg to be '--http=8080', got %s", capturedArgs[2])
+	}
+	if capturedArgs[3] != "/api" {
+		t.Errorf("Expected fourth arg to be '/api', got %s", capturedArgs[3])
+	}
+	if capturedArgs[4] != "localhost:8080" {
+		t.Errorf("Expected fifth arg to be 'localhost:8080', got %s", capturedArgs[4])
+	}
+}
+
+func TestStartServiceFunnel(t *testing.T) {
+	var capturedArgs []string
+	mock := mockCommandRunnerForTests(
+		func(name string, arg ...string) ([]byte, error) {
+			if name == "tailscale" {
+				capturedArgs = arg
+				return []byte("ok"), nil
+			}
+			return nil, fmt.Errorf("unexpected command")
+		},
+		nil,
+	)
+
+	SetCommandRunner(mock)
+	defer resetCommandRunner()
+
+	cmd := startService(443, "http://localhost:4000", "/", "https", "funnel")
+	cmd()
+
+	if len(capturedArgs) != 4 {
+		t.Fatalf("Expected 4 args, got %d: %v", len(capturedArgs), capturedArgs)
+	}
+	if capturedArgs[0] != "funnel" {
+		t.Errorf("Expected first arg to be 'funnel', got %s", capturedArgs[0])
+	}
+	if capturedArgs[1] != "--bg" {
+		t.Errorf("Expected second arg to be '--bg', got %s", capturedArgs[1])
+	}
+	if capturedArgs[2] != "--https=443" {
+		t.Errorf("Expected third arg to be '--https=443', got %s", capturedArgs[2])
+	}
+	if capturedArgs[3] != "localhost:4000" {
+		t.Errorf("Expected fourth arg to be 'localhost:4000', got %s", capturedArgs[3])
+	}
+}
+
+func TestStartServiceFailure(t *testing.T) {
+	mock := mockCommandRunnerForTests(
+		func(name string, arg ...string) ([]byte, error) {
+			if name == "tailscale" {
+				return []byte("permission denied"), errors.New("exit status 1")
+			}
+			return nil, fmt.Errorf("unexpected command")
+		},
+		nil,
+	)
+
+	SetCommandRunner(mock)
+	defer resetCommandRunner()
+
+	cmd := startService(443, "http://localhost:3000", "/", "https", "serve")
+	msg := cmd()
+
+	startMsg, ok := msg.(startCompleteMsg)
+	if !ok {
+		t.Fatalf("Expected startCompleteMsg, got %T", msg)
+	}
+	if startMsg.err == nil {
+		t.Error("Expected error for start failure")
+	}
+	if startMsg.err != nil && !contains(startMsg.err.Error(), "failed to start service") {
+		t.Errorf("Expected error to contain 'failed to start service', got: %v", startMsg.err)
+	}
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 

@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -686,4 +688,487 @@ func TestUpdateUnknownMessageType(t *testing.T) {
 	// Should still work and pass to list
 	_ = newM
 	_ = cmd
+}
+
+func TestUpdateKeyNewServe(t *testing.T) {
+	m := createModelWithServices()
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if !newM.showNewServe {
+		t.Error("Expected showNewServe to be true")
+	}
+	if newM.serveForm.protocol != "https" {
+		t.Error("Expected default protocol to be https")
+	}
+	if cmd != nil {
+		t.Error("Expected nil command")
+	}
+}
+
+func TestUpdateKeyFavourites(t *testing.T) {
+	m := createModelWithServices()
+	m.favourites = []Favourite{
+		{ID: "1", Name: "Test", Port: 443, Target: "http://localhost:3000", Path: "/", Protocol: "https", Mode: "serve"},
+	}
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if !newM.showFavourites {
+		t.Error("Expected showFavourites to be true")
+	}
+	if cmd != nil {
+		t.Error("Expected nil command")
+	}
+}
+
+func TestUpdateNewServeCancel(t *testing.T) {
+	m := createModelWithServices()
+	m.showNewServe = true
+	m.serveForm.inputs[fieldPort].SetValue("9999")
+	
+	msg := tea.KeyMsg{Type: tea.KeyEsc}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.showNewServe {
+		t.Error("Expected showNewServe to be false")
+	}
+	if newM.serveForm.inputs[fieldPort].Value() != "" {
+		t.Error("Expected form to be reset")
+	}
+	if cmd != nil {
+		t.Error("Expected nil command")
+	}
+}
+
+func TestUpdateNewServeSubmitValid(t *testing.T) {
+	mock := mockCommandRunnerForTests(
+		func(name string, arg ...string) ([]byte, error) {
+			if name == "tailscale" {
+				return []byte("ok"), nil
+			}
+			return nil, fmt.Errorf("unexpected command")
+		},
+		nil,
+	)
+	SetCommandRunner(mock)
+	defer resetCommandRunner()
+
+	m := createModelWithServices()
+	m.showNewServe = true
+	m.serveForm.inputs[fieldPort].SetValue("443")
+	m.serveForm.inputs[fieldTarget].SetValue("http://localhost:3000")
+	m.serveForm.inputs[fieldPath].SetValue("/")
+	m.serveForm.protocol = "https"
+	m.serveForm.mode = "serve"
+	m.serveForm.saveToFav = false
+	
+	msg := tea.KeyMsg{Type: tea.KeyEnter}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.showNewServe {
+		t.Error("Expected showNewServe to be false after submit")
+	}
+	if !newM.loading {
+		t.Error("Expected loading to be true")
+	}
+	if cmd == nil {
+		t.Error("Expected startService command")
+	}
+}
+
+func TestUpdateNewServeSubmitInvalidPort(t *testing.T) {
+	m := createModelWithServices()
+	m.showNewServe = true
+	m.serveForm.inputs[fieldPort].SetValue("abc")
+	m.serveForm.inputs[fieldTarget].SetValue("http://localhost:3000")
+	m.serveForm.inputs[fieldPath].SetValue("/")
+	
+	msg := tea.KeyMsg{Type: tea.KeyEnter}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if !newM.showNewServe {
+		t.Error("Expected showNewServe to still be true (validation failed)")
+	}
+	if newM.formError == "" {
+		t.Error("Expected form error for invalid port")
+	}
+	if cmd != nil {
+		t.Error("Expected nil command when validation fails")
+	}
+}
+
+func TestUpdateNewServeSubmitInvalidTarget(t *testing.T) {
+	m := createModelWithServices()
+	m.showNewServe = true
+	m.serveForm.inputs[fieldPort].SetValue("443")
+	m.serveForm.inputs[fieldTarget].SetValue("not-a-url")
+	m.serveForm.inputs[fieldPath].SetValue("/")
+	
+	msg := tea.KeyMsg{Type: tea.KeyEnter}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.formError == "" {
+		t.Error("Expected form error for invalid target")
+	}
+	if cmd != nil {
+		t.Error("Expected nil command when validation fails")
+	}
+}
+
+func TestUpdateAddToFavouritesFromInfo(t *testing.T) {
+	m := createModelWithServices()
+	m.showInfo = true
+	m.infoIndex = 0
+	
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.showInfo {
+		t.Error("Expected showInfo to be false")
+	}
+	if !newM.showNewServe {
+		t.Error("Expected showNewServe to be true")
+	}
+	if newM.serveForm.inputs[fieldPort].Value() != "443" {
+		t.Errorf("Expected port to be pre-populated with 443, got %s", newM.serveForm.inputs[fieldPort].Value())
+	}
+	if newM.serveForm.saveToFav != true {
+		t.Error("Expected saveToFav to be true")
+	}
+	if cmd != nil {
+		t.Error("Expected nil command")
+	}
+}
+
+func TestUpdateStartCompleteMsgSuccess(t *testing.T) {
+	m := createModelWithServices()
+	m.loading = true
+	m.err = errors.New("previous error")
+	
+	msg := startCompleteMsg{}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.loading {
+		t.Error("Expected loading to be false")
+	}
+	if newM.err != nil {
+		t.Error("Expected err to be nil")
+	}
+	if newM.successMsg != "Service started successfully" {
+		t.Errorf("Expected success message, got %s", newM.successMsg)
+	}
+	if cmd == nil {
+		t.Error("Expected fetchStatus command")
+	}
+}
+
+func TestUpdateStartCompleteMsgError(t *testing.T) {
+	m := createModelWithServices()
+	m.loading = true
+	m.successMsg = "previous success"
+	
+	testErr := errors.New("start failed")
+	msg := startCompleteMsg{err: testErr}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.loading {
+		t.Error("Expected loading to be false")
+	}
+	if newM.err != testErr {
+		t.Errorf("Expected err to be %v, got %v", testErr, newM.err)
+	}
+	if newM.successMsg != "" {
+		t.Error("Expected successMsg to be empty")
+	}
+	if cmd != nil {
+		t.Error("Expected nil command")
+	}
+}
+
+func TestUpdateFavouritesLoadedMsg(t *testing.T) {
+	m := createModelWithServices()
+	
+	favourites := []Favourite{
+		{ID: "1", Name: "Test", Port: 443, Target: "http://localhost:3000", Path: "/", Protocol: "https", Mode: "serve"},
+	}
+	msg := favouritesLoadedMsg{favourites: favourites}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if len(newM.favourites) != 1 {
+		t.Errorf("Expected 1 favourite, got %d", len(newM.favourites))
+	}
+	if cmd != nil {
+		t.Error("Expected nil command")
+	}
+}
+
+func TestUpdateFavouriteSavedMsg(t *testing.T) {
+	m := createModelWithServices()
+	
+	msg := favouriteSavedMsg{}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.successMsg != "Favourite saved" {
+		t.Errorf("Expected success message 'Favourite saved', got %s", newM.successMsg)
+	}
+	if cmd != nil {
+		t.Error("Expected nil command")
+	}
+}
+
+func TestUpdateFavouritesViewStart(t *testing.T) {
+	mock := mockCommandRunnerForTests(
+		func(name string, arg ...string) ([]byte, error) {
+			if name == "tailscale" {
+				return []byte("ok"), nil
+			}
+			return nil, fmt.Errorf("unexpected command")
+		},
+		nil,
+	)
+	SetCommandRunner(mock)
+	defer resetCommandRunner()
+
+	m := createModelWithServices()
+	m.showFavourites = true
+	m.favourites = []Favourite{
+		{ID: "1", Name: "Test", Port: 443, Target: "http://localhost:3000", Path: "/", Protocol: "https", Mode: "serve"},
+	}
+	m.syncFavListItems()
+	
+	msg := tea.KeyMsg{Type: tea.KeyEnter}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.showFavourites {
+		t.Error("Expected showFavourites to be false after starting")
+	}
+	if !newM.loading {
+		t.Error("Expected loading to be true")
+	}
+	if cmd == nil {
+		t.Error("Expected startService command")
+	}
+}
+
+func TestUpdateFavouritesViewDeleteConfirm(t *testing.T) {
+	m := createModelWithServices()
+	m.showFavourites = true
+	m.favourites = []Favourite{
+		{ID: "1", Name: "Test", Port: 443, Target: "http://localhost:3000", Path: "/", Protocol: "https", Mode: "serve"},
+	}
+	m.syncFavListItems()
+	
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if !newM.showFavConfirm {
+		t.Error("Expected showFavConfirm to be true")
+	}
+	if newM.favConfirmIndex != 0 {
+		t.Errorf("Expected favConfirmIndex to be 0, got %d", newM.favConfirmIndex)
+	}
+	if cmd != nil {
+		t.Error("Expected nil command")
+	}
+}
+
+func TestUpdateFavouritesViewDeleteYes(t *testing.T) {
+	oldHome := os.Getenv("HOME")
+	oldXDG := os.Getenv("XDG_CONFIG_HOME")
+	tmpDir := t.TempDir()
+	os.Setenv("HOME", tmpDir)
+	os.Unsetenv("XDG_CONFIG_HOME")
+	defer func() {
+		os.Setenv("HOME", oldHome)
+		os.Setenv("XDG_CONFIG_HOME", oldXDG)
+	}()
+
+	m := createModelWithServices()
+	m.showFavConfirm = true
+	m.favConfirmIndex = 0
+	m.favourites = []Favourite{
+		{ID: "1", Name: "Test", Port: 443, Target: "http://localhost:3000", Path: "/", Protocol: "https", Mode: "serve"},
+	}
+	m.syncFavListItems()
+	
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.showFavConfirm {
+		t.Error("Expected showFavConfirm to be false")
+	}
+	if len(newM.favourites) != 0 {
+		t.Errorf("Expected 0 favourites after delete, got %d", len(newM.favourites))
+	}
+	if cmd == nil {
+		t.Error("Expected saveFavouritesCmd command")
+	}
+}
+
+func TestUpdateFavouritesViewEsc(t *testing.T) {
+	m := createModelWithServices()
+	m.showFavourites = true
+	
+	msg := tea.KeyMsg{Type: tea.KeyEsc}
+	newModel, cmd := m.Update(msg)
+	
+	newM, ok := newModel.(Model)
+	if !ok {
+		t.Fatal("Expected Model type")
+	}
+	if newM.showFavourites {
+		t.Error("Expected showFavourites to be false")
+	}
+	if cmd != nil {
+		t.Error("Expected nil command")
+	}
+}
+
+func TestUpdateValidateServeFormEmptyPort(t *testing.T) {
+	form := serveForm{}
+	result := validateServeForm(form)
+	if result != "Port is required" {
+		t.Errorf("Expected 'Port is required', got %s", result)
+	}
+}
+
+func TestUpdateValidateServeFormInvalidPort(t *testing.T) {
+	form := serveForm{}
+	form.inputs[fieldPort].SetValue("abc")
+	result := validateServeForm(form)
+	if result != "Port must be a number between 1 and 65535" {
+		t.Errorf("Expected port error, got %s", result)
+	}
+}
+
+func TestUpdateValidateServeFormInvalidTarget(t *testing.T) {
+	form := serveForm{}
+	form.inputs[fieldPort].SetValue("443")
+	form.inputs[fieldTarget].SetValue("not-a-url")
+	result := validateServeForm(form)
+	if result != "Target must be a URL (http://...) or host:port" {
+		t.Errorf("Expected target error, got %s", result)
+	}
+}
+
+func TestUpdateValidateServeFormMissingName(t *testing.T) {
+	form := serveForm{}
+	form.inputs[fieldPort].SetValue("443")
+	form.inputs[fieldTarget].SetValue("http://localhost:3000")
+	form.inputs[fieldPath].SetValue("/")
+	form.saveToFav = true
+	form.inputs[fieldName].SetValue("")
+	result := validateServeForm(form)
+	if result != "Name is required when saving to favourites" {
+		t.Errorf("Expected name error, got %s", result)
+	}
+}
+
+func TestUpdateValidateServeFormValid(t *testing.T) {
+	form := serveForm{}
+	form.inputs[fieldPort].SetValue("443")
+	form.inputs[fieldTarget].SetValue("http://localhost:3000")
+	form.inputs[fieldPath].SetValue("/")
+	form.saveToFav = false
+	result := validateServeForm(form)
+	if result != "" {
+		t.Errorf("Expected no error, got %s", result)
+	}
+}
+
+func TestUpdateValidateServeFormValidHostPort(t *testing.T) {
+	form := serveForm{}
+	form.inputs[fieldPort].SetValue("443")
+	form.inputs[fieldTarget].SetValue("localhost:3000")
+	form.inputs[fieldPath].SetValue("/")
+	form.saveToFav = false
+	result := validateServeForm(form)
+	if result != "" {
+		t.Errorf("Expected no error for host:port target, got %s", result)
+	}
+}
+
+func TestUpdateResetServeForm(t *testing.T) {
+	form := serveForm{}
+	form.inputs[fieldPort].SetValue("443")
+	form.inputs[fieldTarget].SetValue("http://localhost:3000")
+	form.protocol = "http"
+	form.mode = "funnel"
+	form.saveToFav = true
+	form.focusIndex = 3
+	
+	resetServeForm(&form)
+	
+	if form.inputs[fieldPort].Value() != "" {
+		t.Error("Expected port to be reset")
+	}
+	if form.protocol != "https" {
+		t.Error("Expected protocol to be reset to https")
+	}
+	if form.mode != "serve" {
+		t.Error("Expected mode to be reset to serve")
+	}
+	if form.saveToFav != false {
+		t.Error("Expected saveToFav to be reset")
+	}
+	if form.focusIndex != 0 {
+		t.Error("Expected focusIndex to be reset")
+	}
 }

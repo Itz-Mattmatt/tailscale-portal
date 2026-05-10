@@ -144,3 +144,68 @@ func TestBuildFullURL(t *testing.T) {
 		}
 	}
 }
+
+func TestServicesFromStatusForeground(t *testing.T) {
+	status := TailscaleStatus{
+		TCP: map[string]TCPConfig{
+			"3000": {HTTPS: true},
+		},
+		Web: map[string]WebConfig{
+			"personal-macbook.tailf46b52.ts.net:3000": {
+				Handlers: map[string]HandlerConfig{
+					"/": {Proxy: "http://localhost:5173"},
+				},
+			},
+		},
+		Foreground: map[string]TailscaleStatus{
+			"f7f7a8f71f31e7a3": {
+				TCP: map[string]TCPConfig{
+					"4000": {HTTPS: true},
+				},
+				Web: map[string]WebConfig{
+					"personal-macbook.tailf46b52.ts.net:4000": {
+						Handlers: map[string]HandlerConfig{
+							"/": {Proxy: "http://localhost:4096"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	services := ServicesFromStatus(status)
+
+	// Should have 2 services total (1 top-level, 1 foreground)
+	if len(services) != 2 {
+		t.Errorf("Expected 2 services, got %d", len(services))
+	}
+
+	found4000 := false
+	found3000 := false
+	for _, svc := range services {
+		if svc.Port == "4000" {
+			found4000 = true
+			if svc.Target != "http://localhost:4096" {
+				t.Errorf("Expected target http://localhost:4096, got %s", svc.Target)
+			}
+			if svc.Protocol != "HTTPS" {
+				t.Errorf("Expected HTTPS protocol for port 4000, got %s", svc.Protocol)
+			}
+			if !svc.IsForeground {
+				t.Error("Expected port 4000 service to be marked as foreground")
+			}
+		}
+		if svc.Port == "3000" {
+			found3000 = true
+			if svc.IsForeground {
+				t.Error("Expected port 3000 service to NOT be marked as foreground")
+			}
+		}
+	}
+	if !found4000 {
+		t.Error("Could not find foreground service for port 4000")
+	}
+	if !found3000 {
+		t.Error("Could not find background service for port 3000")
+	}
+}

@@ -127,6 +127,59 @@ func copyToClipboard(text string) tea.Cmd {
 	}
 }
 
+// startService starts a tailscale serve or funnel service.
+// protocol: "http" or "https"
+// mode: "serve" or "funnel"
+func startService(port int, target, path, protocol, mode string) tea.Cmd {
+	return func() tea.Msg {
+		var args []string
+		if mode == "funnel" {
+			args = append(args, "funnel")
+		} else {
+			args = append(args, "serve")
+		}
+		args = append(args, "--bg")
+		if protocol == "https" {
+			args = append(args, fmt.Sprintf("--https=%d", port))
+		} else {
+			args = append(args, fmt.Sprintf("--http=%d", port))
+		}
+		if path != "" && path != "/" {
+			args = append(args, path)
+		}
+		// Tailscale CLI expects localhost:3000, not http://localhost:3000
+		cliTarget := strings.TrimPrefix(target, "http://")
+		args = append(args, cliTarget)
+
+		output, err := cmdRunner.Run("tailscale", args...)
+		if err != nil {
+			return startCompleteMsg{
+				err: fmt.Errorf("failed to start service: %s", string(output)),
+			}
+		}
+		return startCompleteMsg{}
+	}
+}
+
+// loadFavouritesCmd loads favourites from disk asynchronously.
+func loadFavouritesCmd() tea.Cmd {
+	return func() tea.Msg {
+		favourites, err := loadFavourites()
+		return favouritesLoadedMsg{
+			favourites: favourites,
+			err:        err,
+		}
+	}
+}
+
+// saveFavouritesCmd saves favourites to disk asynchronously.
+func saveFavouritesCmd(favourites []Favourite) tea.Cmd {
+	return func() tea.Msg {
+		err := saveFavourites(favourites)
+		return favouriteSavedMsg{err: err}
+	}
+}
+
 // mockCommandRunner is a mock implementation for testing
 type mockCommandRunner struct {
 	RunFunc           func(name string, arg ...string) ([]byte, error)

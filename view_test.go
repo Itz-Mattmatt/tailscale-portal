@@ -474,3 +474,141 @@ func TestViewConfirmMode(t *testing.T) {
 		t.Error("Expected view to contain 'Stop Service' when in confirm mode")
 	}
 }
+
+func TestViewNewServeDialog(t *testing.T) {
+	m := createModelWithServices()
+	m.showNewServe = true
+	m.width = 100
+	m.height = 40
+	
+	view := m.View()
+	if view == "" {
+		t.Error("Expected non-empty view for new serve dialog")
+	}
+}
+
+func TestViewNewServeDialogWithSaveToFav(t *testing.T) {
+	m := createModelWithServices()
+	m.showNewServe = true
+	m.serveForm.saveToFav = true
+	m.width = 100
+	m.height = 40
+	
+	view := m.View()
+	if view == "" {
+		t.Error("Expected non-empty view")
+	}
+}
+
+func TestViewEditFavDialog(t *testing.T) {
+	m := createModelWithServices()
+	m.showEditFav = true
+	m.editFavForm.inputs[fieldPort].SetValue("443")
+	m.editFavForm.inputs[fieldTarget].SetValue("http://localhost:3000")
+	m.editFavForm.inputs[fieldPath].SetValue("/")
+	m.editFavForm.inputs[fieldName].SetValue("Test")
+	m.width = 100
+	m.height = 40
+	
+	view := m.View()
+	if view == "" {
+		t.Error("Expected non-empty view for edit fav dialog")
+	}
+}
+
+func TestViewFavouritesEmpty(t *testing.T) {
+	m := createModelWithServices()
+	m.showFavourites = true
+	m.favourites = []Favourite{}
+	m.width = 100
+	m.height = 40
+	
+	view := m.View()
+	if view == "" {
+		t.Error("Expected non-empty view for empty favourites")
+	}
+}
+
+func TestViewFavouritesWithItems(t *testing.T) {
+	m := createModelWithServices()
+	m.showFavourites = true
+	m.favourites = []Favourite{
+		{ID: "1", Name: "Test", Port: 443, Target: "http://localhost:3000", Path: "/", Protocol: "https", Mode: "serve"},
+	}
+	m.syncFavListItems()
+	m.width = 100
+	m.height = 40
+	
+	view := m.View()
+	if view == "" {
+		t.Error("Expected non-empty view for favourites with items")
+	}
+}
+
+func TestViewFavConfirmDialog(t *testing.T) {
+	m := createModelWithServices()
+	m.showFavConfirm = true
+	m.favConfirmMsg = "Delete favourite 'Test'?"
+	m.width = 100
+	m.height = 40
+	
+	view := m.View()
+	if view == "" {
+		t.Error("Expected non-empty view for fav confirm dialog")
+	}
+}
+
+func TestFavouriteDelegateHeight(t *testing.T) {
+	d := favouriteDelegate{}
+	if d.Height() != 1 {
+		t.Errorf("Expected height 1, got %d", d.Height())
+	}
+}
+
+func TestFavouriteDelegateSpacing(t *testing.T) {
+	d := favouriteDelegate{}
+	if d.Spacing() != 0 {
+		t.Errorf("Expected spacing 0, got %d", d.Spacing())
+	}
+}
+
+func TestFavouriteDelegateUpdate(t *testing.T) {
+	d := favouriteDelegate{}
+	l := list.New([]list.Item{}, d, 80, 20)
+	cmd := d.Update(nil, &l)
+	if cmd != nil {
+		t.Error("Expected nil command from Update")
+	}
+}
+
+func TestFavouriteDelegateRender(t *testing.T) {
+	d := favouriteDelegate{}
+	l := list.New([]list.Item{}, d, 80, 20)
+	l.SetItems([]list.Item{
+		Favourite{ID: "1", Name: "Test", Port: 443, Target: "http://localhost:3000", Path: "/", Protocol: "https", Mode: "serve"},
+	})
+	
+	var buf strings.Builder
+	d.Render(&buf, l, 0, l.Items()[0])
+	
+	output := buf.String()
+	if output == "" {
+		t.Error("Expected non-empty rendered output")
+	}
+	if !strings.Contains(output, "Test") {
+		t.Error("Expected output to contain favourite name")
+	}
+}
+
+func TestFavouriteDelegateRenderNonFavourite(t *testing.T) {
+	d := favouriteDelegate{}
+	l := list.New([]list.Item{}, d, 80, 20)
+	
+	var buf strings.Builder
+	d.Render(&buf, l, 0, fakeItem{})
+	
+	output := buf.String()
+	if output != "" {
+		t.Error("Expected empty output for non-favourite item")
+	}
+}

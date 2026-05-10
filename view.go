@@ -24,6 +24,22 @@ func (m Model) View() string {
 		return m.renderInfoPopup()
 	}
 
+	if m.showNewServe {
+		return m.renderNewServeDialog()
+	}
+
+	if m.showEditFav {
+		return m.renderEditFavDialog()
+	}
+
+	if m.showFavConfirm {
+		return m.renderFavConfirmDialog()
+	}
+
+	if m.showFavourites {
+		return m.renderFavouritesView()
+	}
+
 	var b strings.Builder
 
 	// Header
@@ -125,6 +141,8 @@ func (m Model) renderFooter() string {
 	var hints []string
 
 	hints = append(hints, keyStyle.Render("↑/↓")+" navigate")
+	hints = append(hints, keyStyle.Render("n")+" new")
+	hints = append(hints, keyStyle.Render("f")+" favourites")
 	hints = append(hints, keyStyle.Render("r")+" refresh")
 	hints = append(hints, keyStyle.Render("enter")+" details")
 	hints = append(hints, keyStyle.Render("s")+" stop")
@@ -151,6 +169,8 @@ func (m Model) renderHelpView() string {
 		{"Enter", "View service details"},
 		{"s", "Stop/clear the selected service"},
 		{"c", "Copy selected service URL to clipboard"},
+		{"n", "Start a new service"},
+		{"f", "Open favourites view"},
 		{"r or R", "Refresh the service list"},
 		{"? or h", "Toggle this help dialog"},
 		{"q or Ctrl+C", "Quit the application"},
@@ -232,8 +252,19 @@ func (m Model) renderInfoPopup() string {
 		b.WriteString("\n")
 	}
 
+	if service.IsForeground {
+		b.WriteString("\n")
+		b.WriteString(foregroundBadgeStyle.Render(" FG "))
+		b.WriteString(" This is a foreground service — stop it with Ctrl+C in its terminal")
+	}
+
 	b.WriteString("\n")
-	b.WriteString(keyStyle.Render(" s ") + " stop  ")
+	if service.IsForeground {
+		b.WriteString(keyStyle.Render(" a ") + " add to favourites  ")
+	} else {
+		b.WriteString(keyStyle.Render(" s ") + " stop  ")
+		b.WriteString(keyStyle.Render(" a ") + " add to favourites  ")
+	}
 	b.WriteString(keyStyle.Render(" esc ") + " close")
 
 	dialog := b.String()
@@ -243,6 +274,220 @@ func (m Model) renderInfoPopup() string {
 		lipgloss.Center, lipgloss.Center,
 		lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
+			Padding(1, 2).
+			Render(dialog))
+}
+
+// renderNewServeDialog renders the dialog for starting a new service
+func (m Model) renderNewServeDialog() string {
+	var b strings.Builder
+
+	b.WriteString(dialogTitleStyle.Render(" Start New Service "))
+	b.WriteString("\n\n")
+
+	labels := []string{"Port", "Target", "Path", "Name"}
+	visibleFields := 3 // Port, Target, Path always visible
+	if m.serveForm.saveToFav {
+		visibleFields = 4
+	}
+
+	for i := 0; i < visibleFields; i++ {
+		label := labels[i]
+		input := m.serveForm.inputs[i]
+
+		b.WriteString(formLabelStyle.Render(fmt.Sprintf("%-8s", label+":")))
+		b.WriteString(" ")
+
+		if i == m.serveForm.focusIndex {
+			input.Focus()
+			input.PromptStyle = formInputFocusedStyle
+			input.TextStyle = formInputFocusedStyle
+		} else {
+			input.Blur()
+			input.PromptStyle = formInputStyle
+			input.TextStyle = formInputStyle
+		}
+
+		b.WriteString(input.View())
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+
+	// Protocol toggle
+	b.WriteString(formLabelStyle.Render("Protocol: "))
+	if m.serveForm.focusIndex == 4 { // After text fields
+		if m.serveForm.protocol == "https" {
+			b.WriteString(toggleActiveStyle.Render(" HTTPS "))
+			b.WriteString(" ")
+			b.WriteString(toggleInactiveStyle.Render(" HTTP "))
+		} else {
+			b.WriteString(toggleInactiveStyle.Render(" HTTPS "))
+			b.WriteString(" ")
+			b.WriteString(toggleActiveStyle.Render(" HTTP "))
+		}
+	} else {
+		if m.serveForm.protocol == "https" {
+			b.WriteString(toggleActiveStyle.Render(" HTTPS "))
+			b.WriteString(" ")
+			b.WriteString(toggleInactiveStyle.Render(" HTTP "))
+		} else {
+			b.WriteString(toggleInactiveStyle.Render(" HTTPS "))
+			b.WriteString(" ")
+			b.WriteString(toggleActiveStyle.Render(" HTTP "))
+		}
+	}
+	b.WriteString("\n")
+
+	// Mode toggle
+	b.WriteString(formLabelStyle.Render("Mode:     "))
+	if m.serveForm.mode == "serve" {
+		b.WriteString(toggleActiveStyle.Render(" Serve "))
+		b.WriteString(" ")
+		b.WriteString(toggleInactiveStyle.Render(" Funnel "))
+	} else {
+		b.WriteString(toggleInactiveStyle.Render(" Serve "))
+		b.WriteString(" ")
+		b.WriteString(toggleActiveStyle.Render(" Funnel "))
+	}
+	b.WriteString("\n\n")
+
+	// Save to favourites checkbox
+	checkbox := "[ ]"
+	if m.serveForm.saveToFav {
+		checkbox = "[✓]"
+	}
+	checkboxLabel := checkbox + " Save to favourites"
+	if m.serveForm.focusIndex == int(fieldCount)+2 {
+		b.WriteString(formInputFocusedStyle.Render(checkboxLabel))
+	} else {
+		b.WriteString(checkboxLabel)
+	}
+	b.WriteString("\n\n")
+
+	// Form error
+	if m.formError != "" {
+		b.WriteString(errorStyle.Render("Error: " + m.formError))
+		b.WriteString("\n\n")
+	}
+
+	b.WriteString(dialogFooterStyle.Render("Press tab to navigate • Enter to start • Esc to cancel"))
+
+	dialog := b.String()
+	return lipgloss.Place(m.width, m.height,
+		lipgloss.Center, lipgloss.Center,
+		dialogBoxStyle.Render(dialog))
+}
+
+// renderEditFavDialog renders the dialog for editing a favourite
+func (m Model) renderEditFavDialog() string {
+	var b strings.Builder
+
+	b.WriteString(dialogTitleStyle.Render(" Edit Favourite "))
+	b.WriteString("\n\n")
+
+	labels := []string{"Port", "Target", "Path", "Name"}
+	for i := 0; i < 4; i++ {
+		label := labels[i]
+		input := m.editFavForm.inputs[i]
+
+		b.WriteString(formLabelStyle.Render(fmt.Sprintf("%-8s", label+":")))
+		b.WriteString(" ")
+
+		if i == m.editFavForm.focusIndex {
+			input.Focus()
+			input.PromptStyle = formInputFocusedStyle
+			input.TextStyle = formInputFocusedStyle
+		} else {
+			input.Blur()
+			input.PromptStyle = formInputStyle
+			input.TextStyle = formInputStyle
+		}
+
+		b.WriteString(input.View())
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+
+	// Protocol toggle
+	b.WriteString(formLabelStyle.Render("Protocol: "))
+	if m.editFavForm.protocol == "https" {
+		b.WriteString(toggleActiveStyle.Render(" HTTPS "))
+		b.WriteString(" ")
+		b.WriteString(toggleInactiveStyle.Render(" HTTP "))
+	} else {
+		b.WriteString(toggleInactiveStyle.Render(" HTTPS "))
+		b.WriteString(" ")
+		b.WriteString(toggleActiveStyle.Render(" HTTP "))
+	}
+	b.WriteString("\n")
+
+	// Mode toggle
+	b.WriteString(formLabelStyle.Render("Mode:     "))
+	if m.editFavForm.mode == "serve" {
+		b.WriteString(toggleActiveStyle.Render(" Serve "))
+		b.WriteString(" ")
+		b.WriteString(toggleInactiveStyle.Render(" Funnel "))
+	} else {
+		b.WriteString(toggleInactiveStyle.Render(" Serve "))
+		b.WriteString(" ")
+		b.WriteString(toggleActiveStyle.Render(" Funnel "))
+	}
+	b.WriteString("\n\n")
+
+	if m.formError != "" {
+		b.WriteString(errorStyle.Render("Error: " + m.formError))
+		b.WriteString("\n\n")
+	}
+
+	b.WriteString(dialogFooterStyle.Render("Press tab to navigate • Enter to save • Esc to cancel"))
+
+	dialog := b.String()
+	return lipgloss.Place(m.width, m.height,
+		lipgloss.Center, lipgloss.Center,
+		dialogBoxStyle.Render(dialog))
+}
+
+// renderFavouritesView renders the favourites management view
+func (m Model) renderFavouritesView() string {
+	var b strings.Builder
+
+	b.WriteString(dialogTitleStyle.Render(" ★ Favourites "))
+	b.WriteString("\n")
+
+	if len(m.favourites) == 0 {
+		b.WriteString(emptyStyle.Render("No favourites saved yet. Press 'n' to create a new service."))
+		b.WriteString("\n")
+	} else {
+		b.WriteString(m.favList.View())
+	}
+
+	b.WriteString("\n")
+	b.WriteString(dialogFooterStyle.Render("↑/↓ navigate • Enter start • e edit • d delete • Esc close"))
+
+	return lipgloss.Place(m.width, m.height,
+		lipgloss.Center, lipgloss.Center,
+		dialogBoxStyle.Render(b.String()))
+}
+
+// renderFavConfirmDialog renders the confirmation dialog for deleting a favourite
+func (m Model) renderFavConfirmDialog() string {
+	var b strings.Builder
+
+	b.WriteString(warningStyle.Render(" ⚠ Delete Favourite "))
+	b.WriteString("\n\n")
+	b.WriteString(m.favConfirmMsg)
+	b.WriteString("\n\n")
+	b.WriteString(keyStyle.Render(" y ") + " Yes  ")
+	b.WriteString(keyStyle.Render(" n ") + " No")
+
+	dialog := b.String()
+	return lipgloss.Place(m.width, m.height,
+		lipgloss.Center, lipgloss.Center,
+		lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#FF6B6B")).
 			Padding(1, 2).
 			Render(dialog))
 }
@@ -284,10 +529,20 @@ func (d serviceDelegate) Render(w io.Writer, m list.Model, index int, item list.
 	b.WriteString(protocolBadge)
 	b.WriteString(" ")
 
+	// Foreground indicator
+	if service.IsForeground {
+		b.WriteString(foregroundBadgeStyle.Render("FG"))
+		b.WriteString(" ")
+	}
+
 	// Calculate column widths based on available width
-	serviceWidth := clamp(width-60, 20, 35)
-	pathWidth := clamp(width-serviceWidth-45, 20, 40)
-	urlWidth := width - serviceWidth - pathWidth - 18
+	fgOffset := 0
+	if service.IsForeground {
+		fgOffset = 4 // "FG" badge + space
+	}
+	serviceWidth := clamp(width-60-fgOffset, 20, 35)
+	pathWidth := clamp(width-serviceWidth-45-fgOffset, 20, 40)
+	urlWidth := width - serviceWidth - pathWidth - 18 - fgOffset
 	if urlWidth < 10 {
 		urlWidth = 10
 	}
@@ -333,4 +588,87 @@ func truncate(s string, maxWidth int) string {
 		return s[:maxWidth]
 	}
 	return s[:maxWidth-3] + "..."
+}
+
+// favouriteDelegate is a custom list item delegate for rendering favourites
+type favouriteDelegate struct{}
+
+func (d favouriteDelegate) Height() int                               { return 1 }
+func (d favouriteDelegate) Spacing() int                              { return 0 }
+func (d favouriteDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd { return nil }
+
+func (d favouriteDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	favourite, ok := item.(Favourite)
+	if !ok {
+		return
+	}
+
+	var b strings.Builder
+	width := m.Width()
+	isSelected := index == m.Index()
+
+	// Selection indicator
+	if isSelected {
+		b.WriteString(selectedIndicatorStyle.Render("▸"))
+	} else {
+		b.WriteString(" ")
+	}
+	b.WriteString(" ")
+
+	// Calculate column widths
+	nameWidth := clamp(width-50, 15, 25)
+	targetWidth := clamp(width-nameWidth-35, 20, 35)
+	portWidth := 6
+
+	// Name
+	nameStyle := serviceNameStyle
+	if isSelected {
+		nameStyle = selectedServiceNameStyle
+	}
+	name := truncate(favourite.Name, nameWidth)
+	b.WriteString(nameStyle.Width(nameWidth).Render(name))
+	b.WriteString(" ")
+
+	// Target
+	target := truncate(favourite.Target+favourite.Path, targetWidth)
+	targetStyle := pathTargetStyle
+	if isSelected {
+		targetStyle = selectedPathTargetStyle
+	}
+	b.WriteString(targetStyle.Width(targetWidth).Render(target))
+	b.WriteString(" ")
+
+	// Port
+	port := fmt.Sprintf("%d", favourite.Port)
+	portStyle := urlStyle
+	if isSelected {
+		portStyle = selectedUrlStyle
+	}
+	b.WriteString(portStyle.Width(portWidth).Render(port))
+	b.WriteString(" ")
+
+	// Protocol
+	proto := strings.ToUpper(favourite.Protocol)
+	if len(proto) < 5 {
+		proto = " " + proto
+	}
+	protocolBadge := protocolHTTPStyle.Render(proto)
+	if favourite.Protocol == "https" {
+		protocolBadge = protocolHTTPSStyle.Render(proto)
+	}
+	b.WriteString(protocolBadge)
+	b.WriteString(" ")
+
+	// Mode
+	mode := strings.ToUpper(favourite.Mode)
+	if len(mode) < 5 {
+		mode = " " + mode
+	}
+	modeBadge := protocolHTTPStyle.Render(mode)
+	if favourite.Mode == "funnel" {
+		modeBadge = protocolHTTPSStyle.Render(mode)
+	}
+	b.WriteString(modeBadge)
+
+	fmt.Fprint(w, b.String())
 }
