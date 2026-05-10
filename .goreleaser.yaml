@@ -80,10 +80,10 @@ changelog:
 brews:
   - name: tailscale-portal
     repository:
-      owner: YOUR_GITHUB_USERNAME
+      owner: Itz-Mattmatt 
       name: homebrew-tap
       branch: main
-    homepage: "https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal"
+    homepage: "https://github.com/Itz-Mattmatt/tailscale-portal"
     description: "TUI dashboard for managing Tailscale serve ports"
     license: "MIT"
     directory: Formula
@@ -102,8 +102,8 @@ nfpms:
   - id: packages
     package_name: tailscale-portal
     vendor: "tailscale-portal"
-    homepage: "https://github.com/YOUR_GITHUB_USERNAME/tailscale-portal"
-    maintainer: "Your Name <your.email@example.com>"
+    homepage: "https://github.com/Itz-Mattmatt/tailscale-portal"
+    maintainer: "Matt <matt@mmsoftware.co.uk>"
     description: "TUI dashboard for managing Tailscale serve ports"
     license: "MIT"
     formats:
